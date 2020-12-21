@@ -7,61 +7,11 @@ import pytorch_lightning as pl
 import pytorch_lightning.callbacks as plcb
 import pytorch_lightning.metrics.classification as plmc
 
-from dataset import FewshotDatasetManager
+from fewshot import *
 import typing as _T
 
 import utils as U
 from dataloader import *
-
-
-class FewshotSolver(pl.LightningModule, M.FewshotClassifier):
-
-    def __init__(self, network: M.FewshotClassifier, n_classes=5, lr=1e-4):
-        pl.LightningModule.__init__(self)
-
-        self.network = network
-        self.lr = lr
-        self.evaluators = nn.ModuleDict({
-            "accuracy": plmc.Accuracy(),
-            "precision": plmc.Precision(num_classes=n_classes),
-            "recall": plmc.Recall(num_classes=n_classes),
-            "fbeta": plmc.FBeta(num_classes=n_classes),
-            "f1": plmc.F1(num_classes=n_classes)
-        })
-
-    def forward(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]) -> torch.Tensor:
-        return self.network(queries, *supports)
-
-    def validation_step(self, batch: _T.List[torch.Tensor], batch_idx: int):
-        queries, labels, *supports = batch
-        logits = self.network(queries, *supports)
-
-        for category, evaluator in self.evaluators.items():
-            self.log(f"metrics/{category}", evaluator(logits, labels))
-
-    def training_step(self, batch: _T.List[torch.Tensor], batch_idx: int):
-        queries, labels, *supports = batch
-        logits = self.network(queries, *supports)
-        class_loss = F.cross_entropy(logits, labels)
-        self.log("losses/class_loss", class_loss, on_step=True)
-        return class_loss
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
-
-
-class FewshotDatasetReplacement(pl.Callback):
-
-    def __init__(self, datamodule: FewshotDatasetManager, every_batch=10):
-        self.datamodule = datamodule
-        self.every_batch = every_batch
-        self._count = 0
-
-    def on_train_batch_start(self, trainer: pl.Trainer, pl_module: FewshotSolver, *args):
-        if self._count % self.every_batch == 0:
-            trainer.train_dataloader = self.datamodule.train_dataloader()
-            print("Classes: ", list(self.datamodule.last_datasets.keys()))
-        self._count += 1
 
 
 load = partial(load_iscxvpn2016_bit, pcap_dir="D://Datasets/ISCXVPN2016/", h5_dir="D://Datasets/packets-15k/")
