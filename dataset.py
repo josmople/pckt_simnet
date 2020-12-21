@@ -158,7 +158,7 @@ class FewshotDatasetManager(pl.LightningDataModule):
         if len(self.datasets_val_seen) > 0:
             self.sequence_val = self.generate_sequence({**self.datasets_val_seen, **self.datasets_val_unseen}, n_classes)
 
-    def generate_sequence(self, datasets: T.Dict[str, U.data.Dataset], n_classes=None):
+    def generate_sequence(self, datasets: T.Dict[str, U.data.Dataset], n_classes: int = None):
         n_classes = n_classes or self.n_classes
 
         assert len(datasets) >= n_classes
@@ -180,13 +180,14 @@ class FewshotDatasetManager(pl.LightningDataModule):
                 choices = list(combinations(datasets.keys(), n_classes))
                 shuffle(choices)
 
-    def select_batch(self, dataset, n, generator=None):
-        support = U.data.DataLoader(dataset, batch_size=n, shuffle=True, generator=generator or self.generator)
-        support = next(iter(support))
+    def select_batch(self, dataset: U.data.Dataset, n: int, generator: torch.Generator = None):
+        dataloader = U.data.DataLoader(dataset, batch_size=n, shuffle=True, generator=generator or self.generator)
+        return next(iter(dataloader))
 
-    def build_dataloader(self, datasets: T.Dict[str, U.data.Dataset], n_support=None, n_queries=None, generator=None):
+    def build_dataloader(self, datasets: T.Dict[str, U.data.Dataset], n_support: int = None, n_queries: int = None, generator: torch.Generator = None):
         n_support = n_support or self.n_support
         n_queries = n_queries or self.n_queries
+        generator = generator or self.generator
 
         self.last_datasets = datasets
         dslist = list(datasets.values())
@@ -202,8 +203,7 @@ class FewshotDatasetManager(pl.LightningDataModule):
         # Will be constant for all queries
         supports = []
         for dataset in dslist:
-            support = U.data.DataLoader(dataset, batch_size=n_support, shuffle=True)
-            support = next(iter(support))
+            support = self.select_batch(dataset, n=n_support, generator=generator)
             support = U.data.dconst(support, len(queries))
             supports.append(support)
 
@@ -220,7 +220,7 @@ class FewshotDatasetManager(pl.LightningDataModule):
             return queries, labels, *support
 
         dataset = U.data.dzip(queries, labels, *supports)
-        return U.data.DataLoader(dataset, batch_size=self.n_queries, collate_fn=collate_fn, shuffle=True)
+        return U.data.DataLoader(dataset, batch_size=self.n_queries, collate_fn=collate_fn, shuffle=True, generator=generator)
 
     def train_dataloader(self, n_support=None, n_queries=None) -> U.data.DataLoader:
         datasets = next(self.sequence_train)

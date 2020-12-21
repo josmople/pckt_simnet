@@ -52,15 +52,12 @@ class Simnet(nn.Sequential):
 
 class SimnetClassifier(FewshotClassifier):
 
-    def __init__(self, *args, **kwds):
+    def __init__(self, in_channels, channels=[256, 128, 64, 10]):
         super().__init__()
-        self.simnet = Simnet(*args, **kwds)
+        self.simnet = Simnet(in_channels=in_channels, channels=channels)
 
     def __call__(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]):
         return super().__call__(queries, *supports)
-
-    def forward(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]):
-        raise NotImplementedError()
 
     def forward(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]):
         assert queries.dim() == 2
@@ -100,9 +97,9 @@ class Protonet(nn.Sequential):
 
 class ProtonetClassifier(FewshotClassifier):
 
-    def __init__(self, *args, **kwds):
+    def __init__(self, in_channels, out_channels, mid_channels=[256, 128, 64]):
         super().__init__()
-        self.protonet = Protonet(*args, **kwds)
+        self.protonet = Protonet(in_channels=in_channels, out_channels=out_channels, mid_channels=mid_channels)
 
     def compute_prototype(self, features: torch.Tensor):
         return features.mean(dim=0, keepdim=True)
