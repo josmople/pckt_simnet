@@ -76,15 +76,15 @@ datasets = FewshotDatasetManager(
         "vimeo": load("vimeo", "vpn"),
         "email": load("email", "gmail"),
         "hangouts": load("hangouts", "vpn"),
-        "torrent": load("torrent")
+        "torrent": load("torrent"),
+        "icq": load("icq")
     },
     unseen_classes={
-        "facebook": load("facebook", "vpn"),
-        "youtube": load("youtube", "vpn"),
-        "vimeo": load("vimeo", "vpn"),
-        "email": load("email", "gmail"),
-        "hangouts": load("hangouts", "vpn"),
-        "torrent": load("torrent")
+        "aim": load("aim", "vpn"),
+        "netflix": load("netflix", "vpn"),
+        "ftps": load("ftps", "vpn"),
+        "sftp": load("sftp", "vpn"),
+        "scp": load("scp", "vpn"),
     },
     n_classes=5, n_support=10, n_queries=1000
 )
@@ -98,7 +98,7 @@ trainer.fit(
     solver,
     train_dataloader=datasets.train_dataloader(),
     val_dataloaders=[
-        datasets.val_dataloader(seen=True, unseen=True),
+        datasets.val_dataloader(seen=False, unseen=True),
         # datasets.val_dataloader(seen=True, unseen=False),
         # datasets.val_dataloader(seen=False, unseen=True),
     ]
