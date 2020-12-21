@@ -28,6 +28,15 @@ def fully_connected(channels, activation=None, bias=True):
     return layers
 
 
+class FewshotClassifier(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def __call__(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]) -> torch.Tensor:
+        return super().__call__(queries, *supports)
+
+
 class Simnet(nn.Sequential):
     def __init__(self, in_channels, channels=[256, 128, 64, 10]):
         layers = fully_connected([in_channels * 2] + channels, activation=nn.ReLU, bias=True)[:-1]
@@ -41,11 +50,14 @@ class Simnet(nn.Sequential):
         return super().forward(x).mean(dim=1)
 
 
-class SimnetClassifier(nn.Module):
+class SimnetClassifier(FewshotClassifier):
 
     def __init__(self, *args, **kwds):
         super().__init__()
         self.simnet = Simnet(*args, **kwds)
+
+    def __call__(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]):
+        return super().__call__(queries, *supports)
 
     def forward(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]):
         assert queries.dim() == 2
@@ -83,7 +95,7 @@ class Protonet(nn.Sequential):
         super().__init__(*layers)
 
 
-class ProtonetClassifier(nn.Module):
+class ProtonetClassifier(FewshotClassifier):
 
     def __init__(self, *args, **kwds):
         self.protonet = Protonet(*args, **kwds)
