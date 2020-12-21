@@ -1,10 +1,10 @@
 from dataset import PcapH5Dataset
-from dsmd import *
-import os.path as P
-import numpy as np
+import iscxvpn2016
 
 import typing as _T
 import torch
+import numpy as np
+import os.path as P
 
 
 def load_iscxvpn2016(pos: _T.Union[None, str, _T.List[str]], neg: _T.Union[None, str, _T.List[str]], transform: _T.Union[_T.Callable, None], pcap_dir: str, h5_dir: str):
