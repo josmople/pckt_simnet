@@ -30,11 +30,11 @@ def fully_connected(channels, activation=None, bias=True):
 
 class FewshotClassifier(nn.Module):
 
-    def __init__(self):
-        super().__init__()
-
     def __call__(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]) -> torch.Tensor:
         return super().__call__(queries, *supports)
+
+    def forward(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]) -> torch.Tensor:
+        raise NotImplementedError()
 
 
 class Simnet(nn.Sequential):
@@ -58,6 +58,9 @@ class SimnetClassifier(FewshotClassifier):
 
     def __call__(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]):
         return super().__call__(queries, *supports)
+
+    def forward(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]):
+        raise NotImplementedError()
 
     def forward(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]):
         assert queries.dim() == 2
@@ -98,12 +101,13 @@ class Protonet(nn.Sequential):
 class ProtonetClassifier(FewshotClassifier):
 
     def __init__(self, *args, **kwds):
+        super().__init__()
         self.protonet = Protonet(*args, **kwds)
 
     def compute_prototype(self, features: torch.Tensor):
-        return features.mean(dim=1, keepdim=True)
+        return features.mean(dim=0, keepdim=True)
 
-    def pairwise_distance(x, y):
+    def pairwise_distance(self, x, y):
         assert x.dim() == 2
         assert y.dim() == 2
         x = x.unsqueeze(0)
@@ -126,7 +130,10 @@ class ProtonetClassifier(FewshotClassifier):
         for class_support in supports:
             prototype = self.protonet(class_support)
             assert prototype.size(1) == num_feat
+
             prototype = self.compute_prototype(prototype)
+            assert prototype.size() == (1, num_feat)
+
             prototypes.append(prototype)
 
         prototypes = torch.cat(prototypes, dim=0)

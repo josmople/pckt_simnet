@@ -14,10 +14,11 @@ import utils as U
 from dataloader import *
 
 
-class FewshotSolver(pl.LightningModule):
+class FewshotSolver(pl.LightningModule, M.FewshotClassifier):
 
     def __init__(self, network: M.FewshotClassifier, n_classes=5, lr=1e-4):
-        super().__init__()
+        pl.LightningModule.__init__(self)
+
         self.network = network
         self.lr = lr
         self.evaluators = nn.ModuleDict({
@@ -28,8 +29,8 @@ class FewshotSolver(pl.LightningModule):
             "f1": plmc.F1(num_classes=n_classes)
         })
 
-    def forward(self, x, y):
-        return self.network(x, y)
+    def forward(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]) -> torch.Tensor:
+        return self.network(queries, *supports)
 
     def validation_step(self, batch: _T.List[torch.Tensor], batch_idx: int):
         queries, labels, *supports = batch
@@ -66,6 +67,8 @@ class FewshotDatasetReplacement(pl.Callback):
 load = partial(load_iscxvpn2016_bit, pcap_dir="D://Datasets/ISCXVPN2016/", h5_dir="D://Datasets/packets-15k/")
 
 solver = FewshotSolver(M.ProtonetClassifier(in_channels=416, out_channels=5))
+# solver = FewshotSolver(M.FewshotClassifier(in_channels=416))
+
 datasets = FewshotDatasetManager(
     seen_classes={
         "facebook": load("facebook", "vpn"),
