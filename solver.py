@@ -1,16 +1,9 @@
 from functools import partial
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import model as M
 import pytorch_lightning as pl
 import pytorch_lightning.callbacks as plcb
-import pytorch_lightning.metrics.classification as plmc
 
 from fewshot import *
-import typing as _T
-
-import utils as U
 from dataloader import *
 
 
