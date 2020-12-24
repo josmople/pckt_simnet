@@ -9,8 +9,10 @@ from dataloader import *
 
 load = partial(load_iscxvpn2016_bit, pcap_dir="D://Datasets/ISCXVPN2016/", h5_dir="D://Datasets/packets-15k/")
 
-# solver = FewshotSolver(M.ProtonetClassifier(in_channels=416, out_channels=5))
-solver = FewshotSolver(M.SimnetClassifier(in_channels=416))
+# classifier = M.SimnetClassifier(in_channels=416)
+classifier = M.ProtonetClassifier(in_channels=416, out_channels=5)
+
+solver = FewshotSolver(classifier)
 
 datasets = FewshotDatasetManager(
     seen_classes={
@@ -31,6 +33,7 @@ datasets = FewshotDatasetManager(
     },
     n_classes=5, n_support=10, n_queries=1000
 )
+
 trainer = pl.Trainer(gpus=1, max_epochs=1000, log_every_n_steps=1, precision=16, check_val_every_n_epoch=1, auto_lr_find=True, callbacks=[
     FewshotDatasetReplacement(datasets, every_batch=20),
     plcb.ModelCheckpoint()
