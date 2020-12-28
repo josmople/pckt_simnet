@@ -7,11 +7,10 @@ from fewshot import *
 from dataloader import *
 
 
-def load(pos, neg):
-    return load_iscxvpn2016_bit(pos=pos, neg=neg, pcap_dir="D://Datasets/ISCXVPN2016/", h5_dir="D://Datasets/packets-15k/")
+load = iscxvpn2016(pcap_dir="D://Datasets/ISCXVPN2016/", h5_dir="D://Datasets/packets-15k/", as_bit=True)
 
-
-classifier = M.SimnetClassifier(in_channels=416)
+# classifier = M.SimnetClassifier(in_channels=416)
+classifier = M.SimnetV2Classifier(in_channels=416)
 # classifier = M.ProtonetClassifier(in_channels=416, out_channels=10, mid_channels=[])
 
 solver = FewshotSolver(classifier)
@@ -50,7 +49,6 @@ for i in range(10):
         train_dataloader=datasets.train_dataloader(),
         val_dataloaders=[
             datasets.val_dataloader(seen=False, unseen=True),
-            # datasets.val_dataloader(seen=True, unseen=False),
-            # datasets.val_dataloader(seen=False, unseen=True),
+            datasets.val_dataloader(seen=True, unseen=False),
         ]
     )

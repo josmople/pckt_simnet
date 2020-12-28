@@ -195,12 +195,12 @@ class FewshotSolver(pl.LightningModule, FewshotClassifier):
     def forward(self, queries: torch.Tensor, *supports: T.List[torch.Tensor]) -> torch.Tensor:
         return self.network(queries, *supports)
 
-    def validation_step(self, batch: T.List[torch.Tensor], batch_idx: int):
+    def validation_step(self, batch: T.List[torch.Tensor], batch_idx: int, dataloader_idx: int):
         queries, labels, *supports = batch
         logits = self.network(queries, *supports)
 
         for category, evaluator in self.evaluators.items():
-            self.log(f"metrics/{category}", evaluator(logits, labels))
+            self.log(f"metrics/{dataloader_idx}/{category}", evaluator(logits, labels))
 
     def training_step(self, batch: T.List[torch.Tensor], batch_idx: int):
         queries, labels, *supports = batch

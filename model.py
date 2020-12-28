@@ -81,6 +81,52 @@ class SimnetClassifier(FewshotClassifier):
         return scores
 
 
+class SimnetV2Classifier(FewshotClassifier):
+
+    def __init__(self, in_channels, feature_channels=[128, 64, 32], simnet_channels=[128, 64, 32]):
+        super().__init__()
+        channels = [in_channels, *feature_channels]
+        self.features = nn.Sequential(*fully_connected(channels, activation=nn.ReLU, bias=True)[:-1])
+        self.simnet = Simnet(in_channels=channels[-1], channels=simnet_channels)
+
+    def __call__(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]):
+        return super().__call__(queries, *supports)
+
+    def forward(self, queries: torch.Tensor, *supports: _T.List[torch.Tensor]):
+        assert queries.dim() == 2
+
+        num_query, num_dim = queries.size()
+        num_classes = len(supports)
+
+        assert all([class_supports.dim() == 2 for class_supports in supports])
+        assert all([class_supports.size(1) == num_dim for class_supports in supports])
+
+        scores = []
+        for class_supports in supports:
+            class_score = 0
+            num_support = class_supports.size(0)
+            for i in range(num_support):
+                item = class_supports[i]
+                item = item.unsqueeze(0)
+
+                item_features = self.features(item)
+                item_features = item_features.repeat(num_query, 1)
+
+                queries_features = self.features(queries)
+
+                item_score = self.simnet(queries_features, item_features)
+                if item_score.dim() == 1:
+                    item_score.unsqueeze_(1)
+                assert item_score.dim() == 2
+                class_score += item_score
+            scores.append(class_score)
+            assert class_score.dim() == 2
+
+        scores = torch.cat(scores, dim=1)
+        assert scores.size() == (num_query, num_classes)
+        return scores
+
+
 class Protonet(nn.Sequential):
 
     def __init__(self, in_channels, out_channels, mid_channels=[256, 128, 64]):
