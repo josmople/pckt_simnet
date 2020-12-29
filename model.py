@@ -101,6 +101,8 @@ class SimnetV2Classifier(FewshotClassifier):
         assert all([class_supports.dim() == 2 for class_supports in supports])
         assert all([class_supports.size(1) == num_dim for class_supports in supports])
 
+        queries_features = self.features(queries)
+
         scores = []
         for class_supports in supports:
             class_score = 0
@@ -112,15 +114,15 @@ class SimnetV2Classifier(FewshotClassifier):
                 item_features = self.features(item)
                 item_features = item_features.repeat(num_query, 1)
 
-                queries_features = self.features(queries)
-
                 item_score = self.simnet(queries_features, item_features)
                 if item_score.dim() == 1:
                     item_score.unsqueeze_(1)
+
                 assert item_score.dim() == 2
                 class_score += item_score
-            scores.append(class_score)
+
             assert class_score.dim() == 2
+            scores.append(class_score)
 
         scores = torch.cat(scores, dim=1)
         assert scores.size() == (num_query, num_classes)

@@ -129,22 +129,20 @@ class FewshotDatasetManager(pl.LightningDataModule):
         supports = []
         for dataset in dslist:
             support = self.select_batch(dataset, size=n_support, generator=generator)
-            support = data.dconst(support, len(queries))
             supports.append(support)
 
         def collate_fn(batch):
             queries = []
             labels = []
-            support = []  # Don't touch support since its constant through all iterations
             for row in batch:
-                query, label, *support = row
+                query, label = row
                 queries.append(query)
                 labels.append(label)
             queries = torch.stack(queries, dim=0)
             labels = torch.tensor(labels, device=queries.device)
-            return queries, labels, *support
+            return queries, labels, *supports
 
-        dataset = data.dzip(queries, labels, *supports)
+        dataset = data.dzip(queries, labels)
         return data.DataLoader(dataset, batch_size=self.n_queries, collate_fn=collate_fn, shuffle=True, generator=generator)
 
     def train_dataloader(self, n_support=None, n_queries=None) -> data.DataLoader:
@@ -189,7 +187,8 @@ class FewshotSolver(pl.LightningModule, FewshotClassifier):
             "precision": plmc.Precision(num_classes=n_classes),
             "recall": plmc.Recall(num_classes=n_classes),
             "fbeta": plmc.FBeta(num_classes=n_classes),
-            "f1": plmc.F1(num_classes=n_classes)
+            "f1": plmc.F1(num_classes=n_classes),
+            "confmat": plmc.ConfusionMatrix(num_classes=n_classes)
         })
 
     def forward(self, queries: torch.Tensor, *supports: T.List[torch.Tensor]) -> torch.Tensor:
@@ -200,7 +199,7 @@ class FewshotSolver(pl.LightningModule, FewshotClassifier):
         logits = self.network(queries, *supports)
 
         for category, evaluator in self.evaluators.items():
-            self.log(f"metrics/{dataloader_idx}/{category}", evaluator(logits, labels))
+            self.log(f"metrics/{category}", evaluator(logits, labels))
 
     def training_step(self, batch: T.List[torch.Tensor], batch_idx: int):
         queries, labels, *supports = batch

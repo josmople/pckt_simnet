@@ -40,15 +40,12 @@ trainer = pl.Trainer(gpus=1, max_epochs=100, log_every_n_steps=1, precision=16, 
     plcb.ModelCheckpoint()
 ])
 
-
-for i in range(10):
-    print("FINETUNE: ", i)
-    trainer.tune(solver, train_dataloader=datasets.train_dataloader())
-    trainer.fit(
-        solver,
-        train_dataloader=datasets.train_dataloader(),
-        val_dataloaders=[
-            datasets.val_dataloader(seen=False, unseen=True),
-            datasets.val_dataloader(seen=True, unseen=False),
-        ]
-    )
+trainer.tune(solver, train_dataloader=datasets.train_dataloader())
+trainer.fit(
+    solver,
+    train_dataloader=datasets.train_dataloader(),
+    val_dataloaders=[
+        datasets.val_dataloader(seen=False, unseen=True),
+        datasets.val_dataloader(seen=True, unseen=False),
+    ]
+)
