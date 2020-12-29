@@ -71,7 +71,7 @@ for queries, labels, *supports in dl:
 
     logits = network(queries, *supports)
 
-    print(confmat(logits, labels))
+    print(confmat(labels, labels))
     step += 1
 
     if step > 10:
