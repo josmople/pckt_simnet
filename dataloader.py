@@ -65,10 +65,10 @@ class ustctfc2016:
         assert len(paths) > 0, f"Dataset not found: {name}"
 
         datasets = []
-        for name in paths:
-            pcap_path = P.join(self.pcap_dir, name)
+        for path in paths:
+            pcap_path = P.join(self.pcap_dir, path)
             zip_path = P.splitext(pcap_path)[0].split("-")[0] + ".7z"
-            h5_path = P.splitext(P.join(self.h5_dir, name))[0] + ".h5"
+            h5_path = P.splitext(P.join(self.h5_dir, path))[0] + ".h5"
 
             if not P.exists(pcap_path):
                 if P.exists(zip_path):

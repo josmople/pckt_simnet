@@ -9,7 +9,7 @@ _DB = {
     "Outlook": ["Benign/Outlook.pcap"],
     "Skype": ["Benign/Skype.pcap"],
     "SMB": ["Benign/SMB-1.pcap", "Benign/SMB-2.pcap"],
-    "Weibo": ["Benign/Weibo-1.pcap" "Benign/Weibo-2.pcap" "Benign/Weibo-3.pcap", "Benign/Weibo-4.pcap"],
+    "Weibo": ["Benign/Weibo-1.pcap", "Benign/Weibo-2.pcap", "Benign/Weibo-3.pcap", "Benign/Weibo-4.pcap"],
     "WorldOfWarcraft": ["Benign/WorldOfWarcraft.pcap"],
     "Cridex": ["Malware/Cridex.pcap"],
     "Geodo": ["Malware/Geodo.pcap"],
@@ -20,7 +20,7 @@ _DB = {
     "Shifu": ["Malware/Shifu.pcap"],
     "Tinba": ["Malware/Tinba.pcap"],
     "Virut": ["Malware/Virut.pcap"],
-    "Zeus": ["Malware/Zeus.pcap]"]
+    "Zeus": ["Malware/Zeus.pcap"]
 }
 
 

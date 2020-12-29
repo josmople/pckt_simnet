@@ -3,12 +3,13 @@ import utils as U
 
 class PcapH5Dataset(U.data.ValueDataset):
 
-    def __init__(self, pcap_path, transform=None, h5db_path=None, h5ds_name="all", max_packets=15000, preprocessing=None):
+    def __init__(self, pcap_path, transform=None, h5db_path=None, h5ds_name="all", max_packets=15000, verbose=True, preprocessing=None):
         self.pcap_path = pcap_path
         self.transform = transform
         self.h5db_path = h5db_path
         self.h5ds_name = h5ds_name
         self.max_packets = max_packets
+        self.verbose = verbose
 
         if preprocessing:
             self.preprocessing = preprocessing
@@ -23,26 +24,27 @@ class PcapH5Dataset(U.data.ValueDataset):
         packet.getlayer(0).dst = '0'
         packet.getlayer(0).src = '0'
 
-        if packet.getlayer(1).name == 'IPv6':
-            packet.getlayer(1).src = "0000::0000:0000:0000:0000"
-            packet.getlayer(1).dst = '0000::00'
-        else:
-            packet.getlayer(1).src = "0"
-            packet.getlayer(1).dst = '0'
-
-        if packet.getlayer(2) is not None:
-            packet.getlayer(2).sport = 0
-            packet.getlayer(2).dport = 0
-            hex_bytes = sp.raw(packet)
-
-            if len(hex_bytes) >= 52:
-                num_list = [int(n) for n in hex_bytes][:40 + 12]
+        if packet.getlayer(1) is not None:
+            if packet.getlayer(1).name == 'IPv6':
+                packet.getlayer(1).src = "0000::0000:0000:0000:0000"
+                packet.getlayer(1).dst = '0000::00'
             else:
-                missing = 52 - len(hex_bytes)
-                padding = [0] * missing
-                num_list = [int(n) for n in hex_bytes] + padding
-            num_list = np.asarray(num_list).astype(int).reshape(-1)
-            return num_list
+                packet.getlayer(1).src = "0"
+                packet.getlayer(1).dst = '0'
+
+            if packet.getlayer(2) is not None:
+                packet.getlayer(2).sport = 0
+                packet.getlayer(2).dport = 0
+                hex_bytes = sp.raw(packet)
+
+                if len(hex_bytes) >= 52:
+                    num_list = [int(n) for n in hex_bytes][:40 + 12]
+                else:
+                    missing = 52 - len(hex_bytes)
+                    padding = [0] * missing
+                    num_list = [int(n) for n in hex_bytes] + padding
+                num_list = np.asarray(num_list).astype(int).reshape(-1)
+                return num_list
 
         return None
 
@@ -65,6 +67,8 @@ class PcapH5Dataset(U.data.ValueDataset):
                 return reader.read_all(self.max_packets)
 
         if path.exists(self.h5db_path):
+            if self.verbose:
+                print(f"Loading: pcap='{self.pcap_path}' h5='{self.h5db_path}'")
             self.h5db = hp.File(self.h5db_path, "r")
             return self.h5db[self.h5ds_name]
 
@@ -74,10 +78,18 @@ class PcapH5Dataset(U.data.ValueDataset):
         os.makedirs(dirpath, exist_ok=True)
 
         with hp.File(self.h5db_path, "w") as db, sp.PcapReader(self.pcap_path) as packets:
+
+            if self.verbose:
+                print(f"Caching: pcap='{self.pcap_path}' h5='{self.h5db_path}'")
             cache = None
 
             processed_packets = 0
-            for idx, packet in tqdm(enumerate(packets)):
+
+            iterable = enumerate(packets)
+            if self.verbose:
+                iterable = tqdm(iterable)
+
+            for idx, packet in iterable:
 
                 if self.max_packets and processed_packets >= self.max_packets:
                     break
