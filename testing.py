@@ -31,8 +31,6 @@ def build_dataloader(datasets: T.Dict[str, data.Dataset], n_support: int, n_quer
         support = select_batch(dataset, size=n_support, generator=generator)
         supports.append(support)
 
-    print(len(supports), "AS")
-
     def collate_fn(batch):
         queries = []
         labels = []
