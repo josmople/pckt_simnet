@@ -22,6 +22,8 @@ classifiers = {
 # classifier = M.ProtonetClassifier(in_channels=416, out_channels=10, mid_channels=[])
 
 for classifier_name, classifier in classifiers.items():
+    pl.trainer.seed.seed_everything(seed=2020)
+
     print("----------------------------------------------------------------------------------")
     print(classifier_name)
 

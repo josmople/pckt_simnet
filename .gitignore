@@ -1,2 +1,3 @@
 lightning_logs/
+logs/
 lr_find_temp_model.ckpt
