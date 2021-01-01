@@ -1,3 +1,4 @@
 lightning_logs/
-logs/
+logs*/
+results*/
 lr_find_temp_model.ckpt

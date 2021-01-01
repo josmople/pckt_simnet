@@ -1,4 +1,3 @@
-from functools import partial
 import model as M
 import pytorch_lightning as pl
 import pytorch_lightning.callbacks as plcb
@@ -9,26 +8,40 @@ from fewshot import *
 from dataloader import *
 
 
-iscxvpn2016_loader = iscxvpn2016(pcap_dir="D://Datasets/ISCXVPN2016/", h5_dir="D://Datasets/packets-15k/", as_bit=True)
-ustctfc2016_loader = ustctfc2016(pcap_dir="D://Datasets/USTC-TFC2016/", h5_dir="D://Datasets/USTC-TFC2016-packets/", as_bit=True)
+iscxvpn2016_loader = iscxvpn2016(pcap_dir="D://Datasets/ISCXVPN2016/", h5_dir="D://Datasets/packets-50k/", max_packets_on_cache=50000, as_bit=True, verbose=True)
+ustctfc2016_loader = ustctfc2016(pcap_dir="D://Datasets/USTC-TFC2016/", h5_dir="D://Datasets/USTC-TFC2016-packets-50k/", max_packets_on_cache=50000, as_bit=True, verbose=True)
 
 classifiers = {
     "protonet_1": M.ProtonetClassifier(in_channels=416, mid_channels=[], out_channels=32),
     "protonet_2": M.ProtonetClassifier(in_channels=416, mid_channels=[64], out_channels=32),
     "protonet_3": M.ProtonetClassifier(in_channels=416, mid_channels=[128, 64], out_channels=32),
     "protonet_4": M.ProtonetClassifier(in_channels=416, mid_channels=[256, 128, 64], out_channels=32),
+    "protonet_bottleneck_end": M.ProtonetClassifier(in_channels=416, mid_channels=[256, 128, 64], out_channels=10),
+    "protonet_bottleneck_mid": M.ProtonetClassifier(in_channels=416, mid_channels=[128, 32, 128], out_channels=32),
+
+    "simnet_simple": M.SimnetClassifier(in_channels=416, channels=[10]),
+    "simnet_1": M.SimnetClassifier(in_channels=416, channels=[32]),
+    "simnet_2": M.SimnetClassifier(in_channels=416, channels=[64, 32]),
+    "simnet_3": M.SimnetClassifier(in_channels=416, channels=[128, 64, 32]),
+
+    "reg_protonet_1": M.ProtonetClassifier(in_channels=416, mid_channels=[], out_channels=32),
+    "reg_protonet_2": M.ProtonetClassifier(in_channels=416, mid_channels=[64], out_channels=32),
+    "reg_protonet_3": M.ProtonetClassifier(in_channels=416, mid_channels=[128, 64], out_channels=32),
+    "reg_protonet_4": M.ProtonetClassifier(in_channels=416, mid_channels=[256, 128, 64], out_channels=32),
+    "reg_protonet_bottleneck_end": M.ProtonetClassifier(in_channels=416, mid_channels=[256, 128, 64], out_channels=10),
+    "reg_protonet_bottleneck_mid": M.ProtonetClassifier(in_channels=416, mid_channels=[128, 32, 128], out_channels=32),
+
+    "reg_simnet_simple": M.SimnetClassifier(in_channels=416, channels=[10]),
+    "reg_simnet_1": M.SimnetClassifier(in_channels=416, channels=[32]),
+    "reg_simnet_2": M.SimnetClassifier(in_channels=416, channels=[64, 32]),
+    "reg_simnet_3": M.SimnetClassifier(in_channels=416, channels=[128, 64, 32]),
 }
-# classifier = M.SimnetClassifier(in_channels=416)
-# classifier = M.SimnetV2Classifier(in_channels=416)
-# classifier = M.ProtonetClassifier(in_channels=416, out_channels=10, mid_channels=[])
 
 for classifier_name, classifier in classifiers.items():
-    pltr.seed_everything(seed=2020)
+    pl.seed_everything(seed=2020)
 
     print("----------------------------------------------------------------------------------")
     print(classifier_name)
-
-    solver = FewshotSolver(classifier)
 
     datasets = FewshotDatasetManager(
         seen_classes={
@@ -48,17 +61,22 @@ for classifier_name, classifier in classifiers.items():
             "vimeo": iscxvpn2016_loader("vimeo"),
             "torrent": iscxvpn2016_loader("torrent"),
         },
-        unseen_classes={k: ustctfc2016_loader(k) for k in ustctfc2016_loader.classes()},
+        unseen_classes={k: ustctfc2016_loader(k) for k in ustctfc2016_loader.metadata.names()},
         n_classes=5, n_support=10, n_queries=1000
     )
 
-    tb_logger = pllog.TensorBoardLogger("logs/" + classifier_name)
+    if classifier_name.startswith("reg"):
+        solver = FewshotSolver(classifier, weight_decay=1e-4)
+    else:
+        solver = FewshotSolver(classifier, weight_decay=0)
+
+    tb_logger = pllog.TensorBoardLogger("logs_bigdata_regularized/" + classifier_name)
     trainer = pl.Trainer(
         logger=tb_logger,
         gpus=1,
-        max_epochs=100,
+        max_epochs=30,
         log_every_n_steps=1,
-        precision=16,
+        precision=32,
         check_val_every_n_epoch=1,
         auto_lr_find=True,
         callbacks=[

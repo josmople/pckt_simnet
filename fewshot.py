@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.optim as optim
 import torch.nn.functional as F
 
 import pytorch_lightning as pl
@@ -18,6 +19,50 @@ class FewshotClassifier(nn.Module):
         raise NotImplementedError()
 
 
+def select_batch(dataset: data.Dataset, size: int, generator: torch.Generator = None):
+    dataloader = data.DataLoader(dataset, batch_size=size, shuffle=True, generator=generator)
+    return next(iter(dataloader))
+
+
+def fewshot_dataloader(datasets: T.List[data.Dataset], n_support: int, n_queries: int, generator: torch.Generator = None, select_batch_fn=select_batch):
+
+    target_len = max([len(ds) for ds in datasets])
+    for i, dataset in enumerate(datasets):
+        if len(dataset) < target_len:
+            new_dataset = dataset + dataset
+            while len(new_dataset) < target_len:
+                new_dataset += dataset
+            datasets[i] = new_dataset
+
+    queries = datasets[0]
+    labels = [0] * len(datasets[0])
+
+    for i in range(1, len(datasets)):
+        queries += datasets[i]
+        labels += [i] * len(datasets[i])
+
+    # Select supports
+    # Will be constant for all queries
+    supports = []
+    for dataset in datasets:
+        support = select_batch_fn(dataset, size=n_support, generator=generator)
+        supports.append(support)
+
+    def collate_fn(batch):
+        queries = []
+        labels = []
+        for row in batch:
+            query, label = row
+            queries.append(query)
+            labels.append(label)
+        queries = torch.stack(queries, dim=0)
+        labels = torch.tensor(labels, device=queries.device)
+        return queries, labels, *supports
+
+    dataset = data.dzip(queries, labels)
+    return data.DataLoader(dataset, batch_size=n_queries, collate_fn=collate_fn, shuffle=True, generator=generator)
+
+
 class FewshotDatasetManager(pl.LightningDataModule):
 
     def __init__(
@@ -25,6 +70,7 @@ class FewshotDatasetManager(pl.LightningDataModule):
             seen_classes: T.Dict[str, data.Dataset] = None, unseen_classes: T.Dict[str, data.Dataset] = None,
             n_classes=5, n_support=1, n_queries=1000,
             seen_test_ratio=0.2, seen_val_ratio=0.1, unseen_val_ratio=0.1,
+            all_classes_val=True,
             generator: torch.Generator = None
     ):
 
@@ -76,11 +122,15 @@ class FewshotDatasetManager(pl.LightningDataModule):
             self.sequence_test = self.generate_sequence({**self.datasets_test_seen, **self.datasets_test_unseen}, n_classes)
 
         if len(self.datasets_val_seen) > 0:
-            self.sequence_val_seen = self.generate_sequence(self.datasets_val_seen, n_classes)
+            temp = len(self.datasets_val_seen) if all_classes_val else n_classes
+            self.sequence_val_seen = self.generate_sequence(self.datasets_val_seen, temp)
         if len(self.datasets_val_unseen) > 0:
-            self.sequence_val_unseen = self.generate_sequence(self.datasets_val_unseen, n_classes)
+            temp = len(self.datasets_val_unseen) if all_classes_val else n_classes
+            self.sequence_val_unseen = self.generate_sequence(self.datasets_val_unseen, temp)
         if len(self.datasets_val_seen) > 0:
-            self.sequence_val = self.generate_sequence({**self.datasets_val_seen, **self.datasets_val_unseen}, n_classes)
+            datasets_combine = {**self.datasets_val_seen, **self.datasets_val_unseen}
+            temp = len(datasets_combine) if all_classes_val else n_classes
+            self.sequence_val = self.generate_sequence(datasets_combine, temp)
 
     def generate_sequence(self, datasets: T.Dict[str, data.Dataset], n_classes: int = None, generator: torch.Generator = None):
         n_classes = n_classes or self.n_classes
@@ -116,6 +166,14 @@ class FewshotDatasetManager(pl.LightningDataModule):
 
         self.last_datasets = datasets
         dslist = list(datasets.values())
+
+        target_len = max([len(ds) for ds in dslist])
+        for i, dataset in enumerate(dslist):
+            if len(dataset) < target_len:
+                new_dataset = dataset + dataset
+                while len(new_dataset) < target_len:
+                    new_dataset += dataset
+                dslist[i] = new_dataset
 
         queries = dslist[0]
         labels = [0] * len(dslist[0])
@@ -177,19 +235,13 @@ class FewshotDatasetManager(pl.LightningDataModule):
 
 class FewshotSolver(pl.LightningModule, FewshotClassifier):
 
-    def __init__(self, network: FewshotClassifier, n_classes=5, lr=1e-4):
+    def __init__(self, network: FewshotClassifier = None, lr=1e-4, weight_decay=1e-4):
         pl.LightningModule.__init__(self)
 
         self.network = network
         self.lr = lr
-        self.evaluators = nn.ModuleDict({
-            "accuracy": plmc.Accuracy(),
-            "precision": plmc.Precision(num_classes=n_classes),
-            "recall": plmc.Recall(num_classes=n_classes),
-            "fbeta": plmc.FBeta(num_classes=n_classes),
-            "f1": plmc.F1(num_classes=n_classes),
-            "confmat": plmc.ConfusionMatrix(num_classes=n_classes)
-        })
+        self.weight_decay = weight_decay
+        self.evaluators = nn.ModuleDict()
 
     def forward(self, queries: torch.Tensor, *supports: T.List[torch.Tensor]) -> torch.Tensor:
         return self.network(queries, *supports)
@@ -198,7 +250,19 @@ class FewshotSolver(pl.LightningModule, FewshotClassifier):
         queries, labels, *supports = batch
         logits = self.network(queries, *supports)
 
-        for category, evaluator in self.evaluators.items():
+        if dataloader_idx not in self.evaluators:
+            eval_n_classes = len(supports)
+            self.evaluators[f"dl_{dataloader_idx}"] = nn.ModuleDict({
+                "accuracy": plmc.Accuracy(),
+                "precision": plmc.Precision(num_classes=eval_n_classes),
+                "recall": plmc.Recall(num_classes=eval_n_classes),
+                "fbeta": plmc.FBeta(num_classes=eval_n_classes),
+                "f1": plmc.F1(num_classes=eval_n_classes),
+                "confmat": plmc.ConfusionMatrix(num_classes=eval_n_classes)
+            }).to(device=self.device)
+
+        evaluators = self.evaluators[f"dl_{dataloader_idx}"]
+        for category, evaluator in evaluators.items():
             self.log(f"metrics/{category}", evaluator(logits, labels))
 
     def training_step(self, batch: T.List[torch.Tensor], batch_idx: int):
@@ -209,7 +273,7 @@ class FewshotSolver(pl.LightningModule, FewshotClassifier):
         return class_loss
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
+        return optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
 
 class FewshotDatasetReplacement(pl.Callback):

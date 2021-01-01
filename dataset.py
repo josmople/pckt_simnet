@@ -3,50 +3,25 @@ import utils as U
 
 class PcapH5Dataset(U.data.ValueDataset):
 
-    def __init__(self, pcap_path, transform=None, h5db_path=None, h5ds_name="all", max_packets=15000, verbose=True, preprocessing=None):
+    def __init__(self, pcap_path, h5db_path=None, transform_presave=None, transform_postload=None, h5ds_name="all", max_packets=15000, verbose=True):
         self.pcap_path = pcap_path
-        self.transform = transform
+
+        self.h5db = None
         self.h5db_path = h5db_path
         self.h5ds_name = h5ds_name
+
         self.max_packets = max_packets
         self.verbose = verbose
 
-        if preprocessing:
-            self.preprocessing = preprocessing
+        self.preprocess = transform_presave or self.default_transform_presave
+        super().__init__(self.load_data(), transform_postload)
 
-        self.h5db = None
-        super().__init__(self.load_data(), transform)
-
-    def preprocessing(self, packet):
-        import numpy as np
-        import scapy.all as sp
-
-        packet.getlayer(0).dst = '0'
-        packet.getlayer(0).src = '0'
-
-        if packet.getlayer(1) is not None:
-            if packet.getlayer(1).name == 'IPv6':
-                packet.getlayer(1).src = "0000::0000:0000:0000:0000"
-                packet.getlayer(1).dst = '0000::00'
-            else:
-                packet.getlayer(1).src = "0"
-                packet.getlayer(1).dst = '0'
-
-            if packet.getlayer(2) is not None:
-                packet.getlayer(2).sport = 0
-                packet.getlayer(2).dport = 0
-                hex_bytes = sp.raw(packet)
-
-                if len(hex_bytes) >= 52:
-                    num_list = [int(n) for n in hex_bytes][:40 + 12]
-                else:
-                    missing = 52 - len(hex_bytes)
-                    padding = [0] * missing
-                    num_list = [int(n) for n in hex_bytes] + padding
-                num_list = np.asarray(num_list).astype(int).reshape(-1)
-                return num_list
-
-        return None
+    def default_transform_presave(self, packet):
+        from scapy.packet import raw
+        from numpy import asarray
+        hex_bytes = raw(packet)
+        int_bytes = [int(n) for n in hex_bytes]
+        return asarray(int_bytes).astype(int).reshape(-1)
 
     def reload(self):
         self.close()
@@ -94,7 +69,7 @@ class PcapH5Dataset(U.data.ValueDataset):
                 if self.max_packets and processed_packets >= self.max_packets:
                     break
 
-                packet_numpy = self.preprocessing(packet)
+                packet_numpy = self.preprocess(packet)
 
                 if packet_numpy is None:
                     continue
