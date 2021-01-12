@@ -122,7 +122,7 @@ def plotconfmat(labels, values, outfile):
     fig, ax = plt.subplots()
 
     im, cbar = heatmap(values, labels, labels, ax=ax, cmap="YlGn", cbar_label="similarity")
-    texts = annotate_heatmap(im, val_format="{x:.2f} t")
+    texts = annotate_heatmap(im, val_format="{x:.2f}")
     fig.set_size_inches(18.5, 10.5, forward=True)
 
     fig.tight_layout()

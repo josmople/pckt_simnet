@@ -93,10 +93,15 @@ class ustctfc2016(PcapH5Loader):
 
     import metadata.ustctfc2016 as metadata
 
-    def __call__(self, name: str) -> Dataset:
+    def __call__(self, name: T.Union[str, T.List[str]]) -> Dataset:
 
-        paths = self.metadata.findpath(name)
-        assert len(paths) > 0, f"Dataset not found: {name}"
+        if isinstance(name, str):
+            paths = self.metadata.findpath(name)
+            assert len(paths) > 0, f"Dataset not found: {name}"
+        else:
+            paths = []
+            for n in name:
+                paths += self.metadata.findpath(n)
 
         pcap_list, h5_list = [], []
         for path in paths:

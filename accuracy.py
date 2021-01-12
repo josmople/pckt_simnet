@@ -1,3 +1,5 @@
+from testing import build_dataloader
+from numpy.lib.arraysetops import isin
 import model as M
 import pytorch_lightning as pl
 import pytorch_lightning.callbacks as plcb
@@ -21,29 +23,36 @@ ustctfc2016_loader = ustctfc2016(pcap_dir="D://Datasets/USTC-TFC2016/", h5_dir="
 
 
 classifiers = {
+
+    # "relpnet_1": M.RelationNetClassifier_Protonet1(simnet_channels=[128, 64, 32]),
+    # "protonet_mini_bit": M.ProtonetClassifier(in_channels=416, mid_channels=[], out_channels=10),
+
+    # "relation_1": M.RelationNetClassifier(in_channels=416, feature_channels=[10], simnet_channels=[32, 16, 4]),
+    # "reg_relation_1": M.RelationNetClassifier(in_channels=416, feature_channels=[10], simnet_channels=[32, 16, 4]),
+
     "protonet_1": M.ProtonetClassifier(in_channels=416, mid_channels=[], out_channels=32),
     "protonet_2": M.ProtonetClassifier(in_channels=416, mid_channels=[64], out_channels=32),
     "protonet_3": M.ProtonetClassifier(in_channels=416, mid_channels=[128, 64], out_channels=32),
     "protonet_4": M.ProtonetClassifier(in_channels=416, mid_channels=[256, 128, 64], out_channels=32),
-    "protonet_bottleneck_end": M.ProtonetClassifier(in_channels=416, mid_channels=[256, 128, 64], out_channels=10),
-    "protonet_bottleneck_mid": M.ProtonetClassifier(in_channels=416, mid_channels=[128, 32, 128], out_channels=32),
+    # "protonet_bottleneck_end": M.ProtonetClassifier(in_channels=416, mid_channels=[256, 128, 64], out_channels=10),
+    # "protonet_bottleneck_mid": M.ProtonetClassifier(in_channels=416, mid_channels=[128, 32, 128], out_channels=32),
 
-    "simnet_simple": M.SimnetClassifier(in_channels=416, channels=[10]),
-    "simnet_1": M.SimnetClassifier(in_channels=416, channels=[32]),
-    "simnet_2": M.SimnetClassifier(in_channels=416, channels=[64, 32]),
-    "simnet_3": M.SimnetClassifier(in_channels=416, channels=[128, 64, 32]),
+    # "simnet_simple": M.SimnetClassifier(in_channels=416, channels=[10]),
+    # "simnet_1": M.SimnetClassifier(in_channels=416, channels=[32]),
+    # "simnet_2": M.SimnetClassifier(in_channels=416, channels=[64, 32]),
+    # "simnet_3": M.SimnetClassifier(in_channels=416, channels=[128, 64, 32]),
 
-    "reg_protonet_1": M.ProtonetClassifier(in_channels=416, mid_channels=[], out_channels=32),
-    "reg_protonet_2": M.ProtonetClassifier(in_channels=416, mid_channels=[64], out_channels=32),
-    "reg_protonet_3": M.ProtonetClassifier(in_channels=416, mid_channels=[128, 64], out_channels=32),
-    "reg_protonet_4": M.ProtonetClassifier(in_channels=416, mid_channels=[256, 128, 64], out_channels=32),
-    "reg_protonet_bottleneck_end": M.ProtonetClassifier(in_channels=416, mid_channels=[256, 128, 64], out_channels=10),
-    "reg_protonet_bottleneck_mid": M.ProtonetClassifier(in_channels=416, mid_channels=[128, 32, 128], out_channels=32),
+    # "reg_protonet_1": M.ProtonetClassifier(in_channels=416, mid_channels=[], out_channels=32),
+    # "reg_protonet_2": M.ProtonetClassifier(in_channels=416, mid_channels=[64], out_channels=32),
+    # "reg_protonet_3": M.ProtonetClassifier(in_channels=416, mid_channels=[128, 64], out_channels=32),
+    # "reg_protonet_4": M.ProtonetClassifier(in_channels=416, mid_channels=[256, 128, 64], out_channels=32),
+    # "reg_protonet_bottleneck_end": M.ProtonetClassifier(in_channels=416, mid_channels=[256, 128, 64], out_channels=10),
+    # "reg_protonet_bottleneck_mid": M.ProtonetClassifier(in_channels=416, mid_channels=[128, 32, 128], out_channels=32),
 
-    "reg_simnet_simple": M.SimnetClassifier(in_channels=416, channels=[10]),
-    "reg_simnet_1": M.SimnetClassifier(in_channels=416, channels=[32]),
-    "reg_simnet_2": M.SimnetClassifier(in_channels=416, channels=[64, 32]),
-    "reg_simnet_3": M.SimnetClassifier(in_channels=416, channels=[128, 64, 32]),
+    # "reg_simnet_simple": M.SimnetClassifier(in_channels=416, channels=[10]),
+    # "reg_simnet_1": M.SimnetClassifier(in_channels=416, channels=[32]),
+    # "reg_simnet_2": M.SimnetClassifier(in_channels=416, channels=[64, 32]),
+    # "reg_simnet_3": M.SimnetClassifier(in_channels=416, channels=[128, 64, 32]),
 }
 
 
@@ -77,7 +86,15 @@ unseen_datasets_name = ",".join([str(k) for k in dataset_manager.last_datasets.k
 
 datasets = {
     seen_datasets_name: seen_datasets,
-    unseen_datasets_name: unseen_datasets
+    unseen_datasets_name: unseen_datasets,
+    # "vpn,novpn": build_dataloader({
+    #     "vpn": iscxvpn2016_loader("vpn"),
+    #     "novpn": iscxvpn2016_loader(None, "vpn"),
+    # }, n_support=10, n_queries=1000),
+    # "benign,malware": build_dataloader({
+    #     "benign": ustctfc2016_loader(filter(ustctfc2016_loader.metadata.is_benign, ustctfc2016_loader.metadata.names())),
+    #     "malware": ustctfc2016_loader(filter(ustctfc2016_loader.metadata.is_malware, ustctfc2016_loader.metadata.names())),
+    # }, n_support=10, n_queries=1000)
 }
 
 
@@ -91,7 +108,12 @@ for classifier_name, classifier in classifiers.items():
         print("CHECKPOINT not found:", ckpt_file)
         continue
     ckpt_file = ckpt_file[-1]
-    solver = FewshotSolver(classifier)
+
+    if isinstance(classifier, pl.LightningModule):
+        solver = classifier
+    else:
+        solver = FewshotSolver(classifier)
+
     trainer = pl.Trainer(solver)
     solver.load_state_dict(torch.load(ckpt_file)["state_dict"])
     solver.cpu()

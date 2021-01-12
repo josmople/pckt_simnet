@@ -3,41 +3,36 @@ import torch.nn as nn
 import torch.optim as optim
 import pytorch_lightning as pl
 
-import utils as U
+from glob import glob
 
 
-class Test(pl.LightningModule):
+import model as M
+
+
+def paramcount(m: nn.Module):
+    total = 0
+    for p in m.parameters():
+        total += p.numel()
+    return total
+
+
+class Net(nn.Sequential):
 
     def __init__(self):
-        super().__init__()
-        self.network = nn.Linear(10, 29)
-
-    def forward(self, x):
-        return self.network(x)
-
-    def configure_optimizers(self):
-        return optim.Adam(self.network.parameters())
-
-    def validation_step(self, batch, batch_idx):
-        return self(batch).mean()
-
-    def training_step(self, batch, batch_idx):
-        return self(batch).mean()
+        super().__init__(
+            nn.Conv2d(1, 64, 3),
+            # Some ReLU and Max-Pool
+            nn.Conv2d(64, 64, 3),
+            # Some ReLU and Max-Pool
+            nn.Conv2d(64, 64, 3),
+            # Some ReLU and Max-Pool
+        )
 
 
-class TestCB(pl.Callback):
+a = M.Protonet(416, 32, mid_channels=[])
+# b = M.Protonet(52, 10, mid_channels=[66])
+c = Net()
 
-    def on_validation_batch_start(self, trainer, pl_module, batch, batch_idx, dataloader_idx):
-        print("validations")
-
-    def on_epoch_end(self, trainer, pl_module):
-        print("validations")
-
-
-solver = Test()
-dataset = U.data.dconst(torch.randn(10), 300)
-trainer = pl.Trainer(
-    max_epochs=1,
-    callbacks=[TestCB()]
-)
-trainer.fit(solver, train_dataloader=U.data.DataLoader(dataset, batch_size=3))
+print(paramcount(a))
+# print(paramcount(b))
+print(paramcount(c))

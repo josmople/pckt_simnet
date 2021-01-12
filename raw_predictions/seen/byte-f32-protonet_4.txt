@@ -1,0 +1,15 @@
+test:seen:aim
+test:seen:email
+test:seen:facebook
+test:seen:ftps
+test:seen:gmail
+test:seen:hangouts
+test:seen:icq
+test:seen:youtube
+test:seen:netflix
+test:seen:scp
+test:seen:sftp
+test:seen:skype
+test:seen:spotify
+test:seen:vimeo
+test:seen:torrent
